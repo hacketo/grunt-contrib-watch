@@ -170,8 +170,8 @@ module.exports = function(grunt) {
     return _.defaults.apply(_, args);
   };
 
-  // Run the current queue of task runs
-  Runner.prototype.run = _.debounce(function run() {
+  Runner.prototype.run = function run() {
+    // Run the current queue of task runs
     var self = this;
     if (self.queue.length < 1) {
       self.running = false;
@@ -184,7 +184,7 @@ module.exports = function(grunt) {
     // If we should interrupt
     if (self.running === true) {
       var shouldInterrupt = true;
-      self.queue.forEach(function(name) {
+      self.queue.forEach(function (name) {
         var tr = self.targets[name];
         if (tr && tr.options.interrupt !== true) {
           shouldInterrupt = false;
@@ -198,40 +198,42 @@ module.exports = function(grunt) {
         return;
       }
     }
+    _.debounce(function() {
 
-    // If we should reload
-    if (self.reload) {
-      return self.reloadTask();
-    }
-
-    // Trigger that tasks runs have started
-    self.emit('start');
-    self.running = true;
-
-    // Run each target
-    var shouldComplete = true;
-    async.forEachSeries(self.queue, function(name, next) {
-      var tr = self.targets[name];
-      if (!tr) {
-        return next();
+      // If we should reload
+      if (self.reload) {
+        return self.reloadTask();
       }
 
-      // Re-grab options in case they changed between runs
-      tr.options = self._options(grunt.config([self.name, name, 'options']) || {}, tr.options, self.options);
+      // Trigger that tasks runs have started
+      self.emit('start');
+      self.running = true;
 
-      if (tr.options.spawn === false || tr.options.nospawn === true) {
-        shouldComplete = false;
-      }
-      tr.run(next);
-    }, function() {
-      if (shouldComplete) {
-        self.complete();
-      } else {
-        grunt.task.mark().run(self.nameArgs);
-        self.done();
-      }
-    });
-  }, 250);
+      // Run each target
+      var shouldComplete = true;
+      async.forEachSeries(self.queue, function (name, next) {
+        var tr = self.targets[name];
+        if (!tr) {
+          return next();
+        }
+
+        // Re-grab options in case they changed between runs
+        tr.options = self._options(grunt.config([self.name, name, 'options']) || {}, tr.options, self.options);
+
+        if (tr.options.spawn === false || tr.options.nospawn === true) {
+          shouldComplete = false;
+        }
+        tr.run(next);
+      }, function () {
+        if (shouldComplete) {
+          self.complete();
+        } else {
+          grunt.task.mark().run(self.nameArgs);
+          self.done();
+        }
+      });
+    }, 250)();
+  };
 
   // Push targets onto the queue
   Runner.prototype.add = function add(target) {
